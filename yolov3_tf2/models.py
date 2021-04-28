@@ -161,6 +161,16 @@ def YoloOutput(filters, anchors, classes, name=None):
     return yolo_output
 
 
+# As tensorflow lite doesn't support tf.size used in tf.meshgrid, 
+# we reimplemented a simple meshgrid function that use basic tf function.
+def _meshgrid(n_a, n_b):
+
+    return [
+        tf.reshape(tf.tile(tf.range(n_a), [n_b]), (n_b, n_a)),
+        tf.reshape(tf.repeat(tf.range(n_b), n_a), (n_b, n_a))
+    ]
+
+
 def yolo_boxes(pred, anchors, classes):
     # pred: (batch_size, grid, grid, anchors, (x, y, w, h, obj, ...classes))
     grid_size = tf.shape(pred)[1:3]
@@ -173,7 +183,7 @@ def yolo_boxes(pred, anchors, classes):
     pred_box = tf.concat((box_xy, box_wh), axis=-1)  # original xywh for loss
 
     # !!! grid[x][y] == (y, x)
-    grid = tf.meshgrid(tf.range(grid_size[1]), tf.range(grid_size[0]))
+    grid = _meshgrid(grid_size[1],grid_size[0])
     grid = tf.expand_dims(tf.stack(grid, axis=-1), axis=2)  # [gx, gy, 1, 2]
 
     box_xy = (box_xy + tf.cast(grid, tf.float32)) / \
@@ -201,15 +211,33 @@ def yolo_nms(outputs, anchors, masks, classes):
     class_probs = tf.concat(t, axis=1)
 
     scores = confidence * class_probs
-    boxes, scores, classes, valid_detections = tf.image.combined_non_max_suppression(
-        boxes=tf.reshape(bbox, (tf.shape(bbox)[0], -1, 1, 4)),
-        scores=tf.reshape(
-            scores, (tf.shape(scores)[0], -1, tf.shape(scores)[-1])),
-        max_output_size_per_class=FLAGS.yolo_max_boxes,
-        max_total_size=FLAGS.yolo_max_boxes,
+
+    dscores = tf.squeeze(scores, axis=0)
+    scores = tf.reduce_max(dscores,[1])
+    bbox = tf.reshape(bbox,(-1,4))
+    classes = tf.argmax(dscores,1)
+    selected_indices, selected_scores = tf.image.non_max_suppression_with_scores(
+        boxes=bbox,
+        scores=scores,
+        max_output_size=FLAGS.yolo_max_boxes,
         iou_threshold=FLAGS.yolo_iou_threshold,
-        score_threshold=FLAGS.yolo_score_threshold
+        score_threshold=FLAGS.yolo_score_threshold,
+        soft_nms_sigma=0.5
     )
+    
+    num_valid_nms_boxes = tf.shape(selected_indices)[0]
+
+    selected_indices = tf.concat([selected_indices,tf.zeros(FLAGS.yolo_max_boxes-num_valid_nms_boxes, tf.int32)], 0)
+    selected_scores = tf.concat([selected_scores,tf.zeros(FLAGS.yolo_max_boxes-num_valid_nms_boxes,tf.float32)], -1)
+
+    boxes=tf.gather(bbox, selected_indices)
+    boxes = tf.expand_dims(boxes, axis=0)
+    scores=selected_scores
+    scores = tf.expand_dims(scores, axis=0)
+    classes = tf.gather(classes,selected_indices)
+    classes = tf.expand_dims(classes, axis=0)
+    valid_detections=num_valid_nms_boxes
+    valid_detections = tf.expand_dims(valid_detections, axis=0)
 
     return boxes, scores, classes, valid_detections
 
