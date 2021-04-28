@@ -2,6 +2,7 @@ from absl import app, flags, logging
 from absl.flags import FLAGS
 
 import tensorflow as tf
+import tensorflow.keras.backend as k
 import numpy as np
 import cv2
 from tensorflow.keras.callbacks import (
@@ -21,9 +22,12 @@ import yolov3_tf2.dataset as dataset
 flags.DEFINE_string('dataset', '', 'path to dataset')
 flags.DEFINE_string('val_dataset', '', 'path to validation dataset')
 flags.DEFINE_boolean('tiny', False, 'yolov3 or yolov3-tiny')
-flags.DEFINE_string('weights', './checkpoints/yolov3.tf',
+flags.DEFINE_string('weights', r'.\checkpoints\yolov3.tf',
                     'path to weights file')
-flags.DEFINE_string('classes', './data/coco.names', 'path to classes file')
+# addition for resuming training
+# flags.DEFINE_string('weights', r'.\checkpoints\yolov3_train_16.tf',
+#                      'path to weights file')
+flags.DEFINE_string('classes', r'.\data\waste.names', 'path to classes file')
 flags.DEFINE_enum('mode', 'fit', ['fit', 'eager_fit', 'eager_tf'],
                   'fit: model.fit, '
                   'eager_fit: model.fit(run_eagerly=True), '
@@ -39,9 +43,27 @@ flags.DEFINE_integer('size', 416, 'image size')
 flags.DEFINE_integer('epochs', 2, 'number of epochs')
 flags.DEFINE_integer('batch_size', 8, 'batch size')
 flags.DEFINE_float('learning_rate', 1e-3, 'learning rate')
-flags.DEFINE_integer('num_classes', 80, 'number of classes in the model')
+flags.DEFINE_integer('num_classes', 5, 'number of classes in the model')
 flags.DEFINE_integer('weights_num_classes', None, 'specify num class for `weights` file if different, '
                      'useful in transfer learning with different number of classes')
+
+def doesDataSetContainsEnoughDataForBatch(dataset, batch_size):
+    return len(list(dataset.take(batch_size).as_numpy_iterator())) == batch_size
+
+
+def doesDataSetFileContainsEnoughDataForBatch(sampleFileName="", batch_size=8):
+    dataset = tf.data.TFRecordDataset(sampleFileName)
+    return doesDataSetContainsEnoughDataForBatch(dataset, batch_size=batch_size)
+
+# added to view the learning rate while training
+class LRTensorBoard(TensorBoard):
+    def __init__(self, log_dir, **kwargs):  # add other arguments to __init__ if you need
+        super().__init__(log_dir=log_dir, **kwargs)
+
+    def on_epoch_end(self, epoch, logs=None):
+        logs = logs or {}
+        logs.update({'lr': k.eval(self.model.optimizer.lr)})
+        super().on_epoch_end(epoch, logs)
 
 
 def main(_argv):
@@ -83,6 +105,7 @@ def main(_argv):
         dataset.transform_targets(y, anchors, anchor_masks, FLAGS.size)))
 
     # Configure the model for transfer learning
+    # model.load_weights(FLAGS.weights)  # addition for resuming training
     if FLAGS.transfer == 'none':
         pass  # Nothing to do
     elif FLAGS.transfer in ['darknet', 'no_output']:
@@ -96,6 +119,7 @@ def main(_argv):
         else:
             model_pretrained = YoloV3(
                 FLAGS.size, training=True, classes=FLAGS.weights_num_classes or FLAGS.num_classes)
+
         model_pretrained.load_weights(FLAGS.weights)
 
         if FLAGS.transfer == 'darknet':
@@ -122,6 +146,7 @@ def main(_argv):
             freeze_all(model)
 
     optimizer = tf.keras.optimizers.Adam(lr=FLAGS.learning_rate)
+    # optimizer = tf.keras.optimizers.RMSprop(lr=FLAGS.learning_rate)
     loss = [YoloLoss(anchors[mask], classes=FLAGS.num_classes)
             for mask in anchor_masks]
 
@@ -171,23 +196,33 @@ def main(_argv):
             avg_loss.reset_states()
             avg_val_loss.reset_states()
             model.save_weights(
-                'checkpoints/yolov3_train_{}.tf'.format(epoch))
+                r'checkpoints\yolov3_train_{}.tf'.format(epoch))
     else:
         model.compile(optimizer=optimizer, loss=loss,
-                      run_eagerly=(FLAGS.mode == 'eager_fit'))
+                      run_eagerly=(FLAGS.mode == 'eager_fit'), metrics=['accuracy'])
 
         callbacks = [
             ReduceLROnPlateau(verbose=1),
-            EarlyStopping(patience=3, verbose=1),
-            ModelCheckpoint('checkpoints/yolov3_train_{epoch}.tf',
+            # EarlyStopping(patience=3, verbose=1), # stopped the early stopping to see model performance
+            ModelCheckpoint(r'checkpoints\yolov3_train_{epoch}.tf',
                             verbose=1, save_weights_only=True),
-            TensorBoard(log_dir='logs')
+            # TensorBoard(log_dir='logs'),
+            LRTensorBoard(log_dir='logs')
         ]
+
+        traindataSetFileName = r".\data\waste_train.tfrecord"
+        if not doesDataSetFileContainsEnoughDataForBatch(traindataSetFileName, batch_size=8):
+            raise Exception(f"Data set file {traindataSetFileName} doesn't contain enough data")
+
+        valdataSetFileName = r".\data\waste_val.tfrecord"
+        if not doesDataSetFileContainsEnoughDataForBatch(valdataSetFileName, batch_size=8):
+            raise Exception(f"Data set file {valdataSetFileName} doesn't contain enough data")
 
         history = model.fit(train_dataset,
                             epochs=FLAGS.epochs,
                             callbacks=callbacks,
-                            validation_data=val_dataset)
+                            validation_data=val_dataset
+                            )
 
 
 if __name__ == '__main__':

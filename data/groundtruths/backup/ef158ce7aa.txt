@@ -1,0 +1,5 @@
+kitchen_waste 157 43 248 137
+kitchen_waste 184 56 265 130
+kitchen_waste 76 59 172 131
+kitchen_waste 11 41 107 89
+kitchen_waste 2 80 101 140

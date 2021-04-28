@@ -20,16 +20,29 @@ from tensorflow.keras.losses import (
     binary_crossentropy,
     sparse_categorical_crossentropy
 )
-from .utils import broadcast_iou
+from yolov3_tf2.utils import broadcast_iou
 
-flags.DEFINE_integer('yolo_max_boxes', 100,
+flags.DEFINE_integer('yolo_max_boxes', 150,
                      'maximum number of boxes per image')
 flags.DEFINE_float('yolo_iou_threshold', 0.5, 'iou threshold')
-flags.DEFINE_float('yolo_score_threshold', 0.5, 'score threshold')
+flags.DEFINE_float('yolo_score_threshold', 0.40, 'score threshold')  # default value was 0.5
 
-yolo_anchors = np.array([(10, 13), (16, 30), (33, 23), (30, 61), (62, 45),
-                         (59, 119), (116, 90), (156, 198), (373, 326)],
+# customised YOLO anchors training 1 - 12092020
+# yolo_anchors = np.array([(39, 88), (47, 91), (69, 136), (89, 198), (123, 271),
+#                          (151, 319), (195, 450), (227, 479), (300, 534)],
+#                         np.float32) / 416
+
+# customised YOLO anchors training 2 - 15092020
+yolo_anchors = np.array([(53, 103), (166, 326), (260, 503), (397, 621), (445, 641),
+                         (531, 774), (555, 886), (758, 1023), (841, 1169)],
                         np.float32) / 416
+
+
+# original YOLO anchors
+# yolo_anchors = np.array([(10, 13), (16, 30), (33, 23), (30, 61), (62, 45),
+#                           (59, 119), (116, 90), (156, 198), (373, 326)],
+#                          np.float32) / 416
+
 yolo_anchor_masks = np.array([[6, 7, 8], [3, 4, 5], [0, 1, 2]])
 
 yolo_tiny_anchors = np.array([(10, 14), (23, 27), (37, 58),
@@ -256,7 +269,8 @@ def YoloV3Tiny(size=None, channels=3, anchors=yolo_tiny_anchors,
     return Model(inputs, outputs, name='yolov3_tiny')
 
 
-def YoloLoss(anchors, classes=80, ignore_thresh=0.5):
+# ingnore threshold was originally set to 0.5
+def YoloLoss(anchors, classes=80, ignore_thresh=0.40):
     def yolo_loss(y_true, y_pred):
         # 1. transform all pred outputs
         # y_pred: (batch_size, grid, grid, anchors, (x, y, w, h, obj, ...cls))

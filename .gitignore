@@ -2,12 +2,19 @@
 *.weights
 *.tar
 *.tfrecord
+*.jpg
+*.jpeg
+*.xml
 /checkpoints/*
 /serving/*
 /logs/
 /Untitled.ipynb
 /output.jpg
 /data/voc2012_raw/
+/Training_logs_15092020_adam/*
+/Training_logs_15092020_adam_custom_anchors/*
+/Training_logs_15092020_RMSprop/*
+/Object-Detection-Metrics/*
 
 # Created by https://www.gitignore.io/api/python
 # Edit at https://www.gitignore.io/?templates=python

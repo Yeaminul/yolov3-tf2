@@ -8,12 +8,12 @@ import tensorflow as tf
 import lxml.etree
 import tqdm
 
-flags.DEFINE_string('data_dir', './data/voc2012_raw/VOCdevkit/VOC2012/',
+flags.DEFINE_string('data_dir', r'D:\Python World\yolo_tensorflow\yolov3-tf2\data\waste',
                     'path to raw PASCAL VOC dataset')
 flags.DEFINE_enum('split', 'train', [
                   'train', 'val'], 'specify train or val spit')
-flags.DEFINE_string('output_file', './data/voc2012_train.tfrecord', 'outpot dataset')
-flags.DEFINE_string('classes', './data/voc2012.names', 'classes file')
+flags.DEFINE_string('output_file', r'D:\Python World\yolo_tensorflow\yolov3-tf2\data\waste_train.tfrecord', 'output dataset')
+flags.DEFINE_string('classes', r'D:\Python World\yolo_tensorflow\yolov3-tf2\data\waste.names', 'classes file')
 
 
 def build_example(annotation, class_map):
@@ -87,14 +87,22 @@ def parse_xml(xml):
 
 
 def main(_argv):
-    class_map = {name: idx for idx, name in enumerate(
-        open(FLAGS.classes).read().splitlines())}
+    # class_map = {name: idx for idx, name in enumerate(
+    #     open(FLAGS.classes).read().splitlines())}
+    class_map = {'metal': 0,
+                 'plastic': 1,
+                 'paper': 2,
+                 'kitchen_waste': 3,
+                 'glass': 4}
     logging.info("Class mapping loaded: %s", class_map)
 
     writer = tf.io.TFRecordWriter(FLAGS.output_file)
+
+    # os.chdir(r'D:\Python World\yolo_tensorflow\yolov3-tf2\data\waste\ImageSets\Main')  # modification v1
     image_list = open(os.path.join(
         FLAGS.data_dir, 'ImageSets', 'Main', '%s.txt' % FLAGS.split)).read().splitlines()
     logging.info("Image list loaded: %d", len(image_list))
+
     for name in tqdm.tqdm(image_list):
         annotation_xml = os.path.join(
             FLAGS.data_dir, 'Annotations', name + '.xml')

@@ -1,0 +1,4 @@
+plastic 65 120 133 155
+plastic 131 120 188 144
+plastic 123 141 180 163
+plastic 216 133 261 174

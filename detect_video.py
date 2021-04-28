@@ -58,10 +58,10 @@ def main(_argv):
     while True:
         _, img = vid.read()
 
-        if img is None:
-            logging.warning("Empty Frame")
-            time.sleep(0.1)
-            continue
+        # if img is None:
+        #     logging.warning("Empty Frame")
+        #     time.sleep(0.1)
+        #     continue
 
         img_in = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         img_in = tf.expand_dims(img_in, 0)

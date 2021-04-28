@@ -1,0 +1,10 @@
+plastic 20 66 143 148
+plastic 9 133 162 209
+plastic 164 187 228 241
+plastic 112 220 191 318
+plastic 15 212 78 256
+plastic 464 188 565 287
+plastic 282 110 364 177
+plastic 228 36 277 85
+plastic 221 195 274 239
+plastic 340 142 484 245
